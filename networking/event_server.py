@@ -4,7 +4,7 @@ from auth.auth_manager import AuthManager
 from core.models.server import Server
 from core.models.channel import Channel
 from core.models.message import Message
-from core.enums import ChannelType, Permission
+from core.enums import ChannelType, Permission 
 
 
 class EventServer:
@@ -54,6 +54,8 @@ class EventServer:
             await self.handle_auth(payload, writer)
         elif event == "MESSAGE_CREATE":
             await self.handle_message_create(payload, writer)
+        elif event == "VOICE_JOIN":
+            await self.handle_voice_join(payload, writer)
         else:
             await self.send_error(writer, f"Unknown event: {event}")
 
@@ -70,6 +72,25 @@ class EventServer:
                 return
 
         await self.send_event(writer, "AUTH_FAILED", {"reason": "Invalid credentials"})
+
+    async def handle_voice_join(self, payload: dict, writer: asyncio.StreamWriter):
+        user_id = self.clients.get(writer)
+        if not user_id:
+            await self.send_error(writer, "Not authenticated")
+            return
+
+        channel_id = payload.get("channel_id")
+        udp_port = payload.get("udp_port")
+        peer_ip = writer.get_extra_info("peername")[0]
+
+        channel = self.community.channels.get(channel_id)
+        if not channel:
+            await self.send_error(writer, "Invalid channel")
+            return
+
+        # Add user to voice in channel
+        channel.join_voice(user_id, (peer_ip, udp_port))
+        await self.send_event(writer, "VOICE_JOINED", {"channel_id": channel.id})
 
     async def handle_message_create(self, payload: dict, writer: asyncio.StreamWriter):
         user_id = self.clients.get(writer)

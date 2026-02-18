@@ -1,5 +1,3 @@
-# core/models/role.py
-
 import uuid
 from core.enums import Permission, RoleType
 

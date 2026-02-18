@@ -5,6 +5,7 @@ from core.models.channel import Channel
 from core.enums import ChannelType, RoleType, Permission
 from auth.auth_manager import AuthManager
 from networking.event_server import EventServer
+from networking.voice_server import VoiceServer  # <-- import it
 
 def setup_demo():
     auth = AuthManager()
@@ -13,6 +14,7 @@ def setup_demo():
     # Create roles
     owner_role = Role("Owner", RoleType.OWNER)
     owner_role.grant(Permission.SEND_MESSAGE)
+    owner_role.grant(Permission.SPEAK)  # <-- make sure SPEAK permission exists
     community.add_role(owner_role)
 
     # Create demo users
@@ -20,7 +22,7 @@ def setup_demo():
     user.assign_role(owner_role.id)
     community.add_member(user)
 
-    # Create a text channel
+    # Create a text channel (we will also allow voice)
     text_channel = Channel("general", ChannelType.TEXT)
     community.add_channel(text_channel)
 
@@ -33,15 +35,22 @@ def setup_demo():
     for ch_id, ch in community.channels.items():
         print(f"{ch.name} -> {ch_id}")
 
-
-    return auth, community
-
+    return auth, community, text_channel  # <-- return the channel
 
 async def main():
-    auth, community = setup_demo()
-    server = EventServer(host="0.0.0.0", port=8765, auth=auth, community=community)
-    await server.start()
+    auth, community, demo_channel = setup_demo()
 
+    # Start EventServer
+    event_server = EventServer(host="0.0.0.0", port=8765, auth=auth, community=community)
+    
+    # Start VoiceServer for that channel
+    voice_server = VoiceServer(host="0.0.0.0", port=5000, channel=demo_channel)
+
+    # Run both servers concurrently
+    await asyncio.gather(
+        event_server.start(),
+        voice_server.start()
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
