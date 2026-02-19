@@ -1,4 +1,3 @@
-# core/models/channel.py
 import uuid
 from core.enums import ChannelType
 from core.models.message import Message

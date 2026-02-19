@@ -5,7 +5,10 @@ from core.models.channel import Channel
 from core.enums import ChannelType, RoleType, Permission
 from auth.auth_manager import AuthManager
 from networking.event_server import EventServer
-from networking.voice_server import VoiceServer  # <-- import it
+from networking.voice_server import VoiceServer
+from persistence.database import Database
+
+db = Database()
 
 def setup_demo():
     auth = AuthManager()
@@ -23,8 +26,15 @@ def setup_demo():
     community.add_member(user)
 
     # Create a text channel (we will also allow voice)
-    text_channel = Channel("general", ChannelType.TEXT)
-    community.add_channel(text_channel)
+    existing_channels = db.load_channels(community.id)
+
+    if not existing_channels:
+        text_channel = Channel("general", ChannelType.TEXT)
+        community.add_channel(text_channel)
+        db.save_channel(community.id, text_channel)
+    else:
+        text_channel = None
+
 
     # DEMO USER
     user = auth.create_user("caleb", "12345")

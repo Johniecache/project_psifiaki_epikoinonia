@@ -29,3 +29,17 @@ class RealtimeServer:
         server = await asyncio.start_server(self.handler, self.host, self.port)
         async with server:
             await server.serve_forever()
+
+    def remove_channel(self, channel_id: str):
+        if channel_id in self.channels:
+            del self.channels[channel_id]
+
+    def get_channel(self, channel_id: str | None = None, name: str | None = None):
+        if channel_id and channel_id in self.channels:
+            return self.channels[channel_id]
+        if name:
+            for ch in self.channels.values():
+                if ch.name == name:
+                    return ch
+        return None
+

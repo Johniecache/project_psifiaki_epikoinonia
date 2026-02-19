@@ -20,3 +20,7 @@ class Server:
 
     def add_channel(self, channel: Channel):
         self.channels[channel.id] = channel
+
+    def get_channel(self, channel_id: str):
+        return self.channels.get(channel_id)
+
