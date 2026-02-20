@@ -8,7 +8,7 @@ CHUNK = 960
 RATE = 48000
 CHANNELS = 1
 FORMAT = pyaudio.paInt16
-SERVER_HOST = "172.17.154.120" #127.0.0.1
+SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 8765
 
 class ClientController:
@@ -234,3 +234,4 @@ class ClientController:
         if self.connected:
             self.writer.close()
             self.connected = False
+
