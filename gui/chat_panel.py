@@ -4,6 +4,7 @@ from core.enums import ChannelType
 import asyncio
 from core.models.channel import Channel
 from core.enums import ChannelType
+from gui.settings.settings_window import SettingsWindow
 
 class ChatPanel(tk.Frame):
     def __init__(self, parent, client_controller):
@@ -13,18 +14,35 @@ class ChatPanel(tk.Frame):
         self.channel: object | None = None
 
         # ---------------- UI ----------------
+        # Sidebar container (list + buttons)
+        self.sidebar_frame = tk.Frame(self)
+        self.sidebar_frame.pack(side="left", fill="y", padx=5, pady=5)
+
         # Channel list
-        self.channel_listbox = tk.Listbox(self)
-        self.channel_listbox.pack(side="left", fill="y", padx=5, pady=5)
+        self.channel_listbox = tk.Listbox(self.sidebar_frame)
+        self.channel_listbox.pack(side="top", fill="y", expand=True)
         self.channel_listbox.bind("<<ListboxSelect>>", self.on_channel_select)
 
-        # Buttons for channel management
-        self.add_button = tk.Button(self, text="Add", command=self.add_channel_dialog)
-        self.add_button.pack(pady=2)
-        self.edit_button = tk.Button(self, text="Edit", command=self.edit_channel_dialog)
-        self.edit_button.pack(pady=2)
-        self.remove_button = tk.Button(self, text="Remove", command=self.remove_channel)
-        self.remove_button.pack(pady=2)
+        # -------- Channel Buttons Container --------
+        self.channel_buttons_frame = tk.Frame(self.sidebar_frame)
+        self.channel_buttons_frame.pack(side="top", pady=5)
+
+        # Top row: Add & Edit
+        self.top_button_row = tk.Frame(self.channel_buttons_frame)
+        self.top_button_row.pack(side="top", pady=2)
+
+        self.add_button = tk.Button(self.top_button_row, text="Add", command=self.add_channel_dialog)
+        self.add_button.pack(side="left", padx=2)
+
+        self.edit_button = tk.Button(self.top_button_row, text="Edit", command=self.edit_channel_dialog)
+        self.edit_button.pack(side="left", padx=2)
+
+        # Bottom row: Remove centered
+        self.bottom_button_row = tk.Frame(self.channel_buttons_frame)
+        self.bottom_button_row.pack(side="top", pady=2)
+
+        self.remove_button = tk.Button(self.bottom_button_row, text="Remove", command=self.remove_channel)
+        self.remove_button.pack()
 
         # Chat area
         self.chat_display = scrolledtext.ScrolledText(self, state="disabled", width=50, height=20)
@@ -40,6 +58,10 @@ class ChatPanel(tk.Frame):
 
         self.send_button = tk.Button(self.input_frame, text="Send", command=self.send_message)
         self.send_button.pack(side="right", padx=5)
+
+        # ----------------- Settings -----------------
+        self.settings_button = tk.Button(self, text="⚙", command=self.open_settings)
+        self.settings_button.pack(side="top", anchor="ne", padx=5, pady=5)
 
         # ---- Voice Row 1 (Join + Mute) ----
         self.voice_row1 = tk.Frame(self)
@@ -144,6 +166,9 @@ class ChatPanel(tk.Frame):
                 }),
                 self.client_controller.loop
             )
+
+    def open_settings(self):
+        SettingsWindow(self)
 
     def add_channel_from_server(self, channel_data):
         channel = Channel(

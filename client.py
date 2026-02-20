@@ -34,6 +34,9 @@ class ClientController:
         self.muted = False
         self.deafened = False
 
+        self.input_device_index = None
+        self.output_device_index = None
+
 
     def set_channel_callback(self, callback):
         self.channel_callback = callback
@@ -178,8 +181,23 @@ class ClientController:
             self.loop
         )
         self.audio = pyaudio.PyAudio()
-        self.stream_in = self.audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
-        self.stream_out = self.audio.open(format=FORMAT, channels=CHANNELS, rate=RATE, output=True, frames_per_buffer=CHUNK)
+        self.stream_in = self.audio.open(
+            format=FORMAT,
+            channels=CHANNELS,
+            rate=RATE,
+            input=True,
+            frames_per_buffer=CHUNK,
+            input_device_index=self.input_device_index
+        )
+
+        self.stream_out = self.audio.open(
+            format=FORMAT,
+            channels=CHANNELS,
+            rate=RATE,
+            output=True,
+            frames_per_buffer=CHUNK,
+            output_device_index=self.output_device_index
+        )
         self.voice_task = threading.Thread(target=self._voice_loop, daemon=True)
         self.voice_task.start()
 
