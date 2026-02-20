@@ -48,6 +48,8 @@ class ChatPanel(tk.Frame):
         self.chat_display = scrolledtext.ScrolledText(self, state="disabled", width=50, height=20)
         self.chat_display.pack(side="top", fill="both", expand=True, padx=5, pady=5)
 
+        self.chat_display.bind("<Button-3>", self.on_right_click)
+
         # ---- Message input row ----
         self.input_frame = tk.Frame(self)
         self.input_frame.pack(fill="x", padx=5, pady=5)
@@ -259,6 +261,49 @@ class ChatPanel(tk.Frame):
         for msg in channel.messages:
             self.display_message(msg.author_id, msg.content)
         self.chat_display.configure(state="disabled")
+
+    # ---------------- Right Click ----------------
+    def on_right_click(self, event):
+        try:
+            index = self.chat_display.index(f"@{event.x},{event.y}")
+            line_num = int(index.split('.')[0])
+            line_text = self.chat_display.get(f"{line_num}.0", f"{line_num}.end").strip()
+            if not line_text:
+                return
+            menu = tk.Menu(self, tearoff=0)
+            menu.add_command(label="Edit", command=lambda: self.edit_message_dialog(line_num))
+            menu.add_command(label="Delete", command=lambda: self.delete_message(line_num))
+            menu.add_command(label="React", command=lambda: self.react_message_dialog(line_num))
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def edit_message_dialog(self, line_num):
+        msg_text = self.chat_display.get(f"{line_num}.0", f"{line_num}.end").strip()
+        new_text = tk.simpledialog.askstring("Edit Message", "New content:", initialvalue=msg_text)
+        if new_text and self.client_controller.channel_id:
+            msg_id = self.channel.messages[line_num-1].id
+            asyncio.run_coroutine_threadsafe(
+                self.client_controller.edit_message(self.channel.id, msg_id, new_text),
+                self.client_controller.loop
+            )
+
+    def delete_message(self, line_num):
+        if self.client_controller.channel_id:
+            msg_id = self.channel.messages[line_num-1].id
+            asyncio.run_coroutine_threadsafe(
+                self.client_controller.delete_message(self.channel.id, msg_id),
+                self.client_controller.loop
+            )
+
+    def react_message_dialog(self, line_num):
+        emoji = tk.simpledialog.askstring("React", "Enter emoji:")
+        if emoji and self.client_controller.channel_id:
+            msg_id = self.channel.messages[line_num-1].id
+            asyncio.run_coroutine_threadsafe(
+                self.client_controller.add_reaction(self.channel.id, msg_id, emoji),
+                self.client_controller.loop
+            )
 
     # ---------------- Messaging ----------------
     def display_message(self, author, content):

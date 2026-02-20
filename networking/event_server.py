@@ -6,6 +6,7 @@ from core.models.channel import Channel
 from core.models.message import Message
 from core.enums import ChannelType, Permission
 from persistence.database import Database
+from core.controllers.channel_controller import ChannelController
 
 
 class EventServer:
@@ -18,6 +19,7 @@ class EventServer:
         self.active_channels = {}
         self.db = Database()
 
+        self.channel_controller = ChannelController(community, self.db)
         self._load_persisted_data()
 
     # ---------------- LOAD ON BOOT ----------------
@@ -83,9 +85,16 @@ class EventServer:
             await self.handle_channel_update(payload, writer)
         elif event == "VOICE_JOIN":
             await self.handle_voice_join(payload, writer)
-
         elif event == "VOICE_LEAVE":
             await self.handle_voice_leave(payload, writer)
+        elif event == "MESSAGE_EDIT":
+            await self.handle_message_edit(payload, writer)
+        elif event == "MESSAGE_DELETE":
+            await self.handle_message_delete(payload, writer)
+        elif event == "MESSAGE_REACT":
+            await self.handle_message_react(payload, writer)
+        elif event == "MESSAGE_REMOVE_REACT":
+            await self.handle_message_remove_react(payload, writer)
 
     # ---------------- AUTH ----------------
 
@@ -123,15 +132,12 @@ class EventServer:
 
         await self.send_event(writer, "AUTH_FAILED", {"reason": "Invalid credentials"})
 
-    # ---------------- CHANNEL CREATE ----------------
-
+     # ---------------- CHANNEL CREATE ----------------
+     
     async def handle_channel_create(self, payload, writer):
         name = payload.get("name")
         type_str = payload.get("type")
-
-        channel = Channel(name, ChannelType[type_str])
-        self.community.add_channel(channel)
-        self.db.save_channel(self.community.id, channel)
+        channel = self.channel_controller.create_channel(name, ChannelType[type_str])
 
         await self.broadcast({
             "event": "CHANNEL_CREATE",
@@ -140,31 +146,17 @@ class EventServer:
 
     async def handle_channel_delete(self, payload, writer):
         channel_id = payload.get("channel_id")
-
-        if channel_id in self.community.channels:
-            del self.community.channels[channel_id]
-            self.db.delete_channel(channel_id)
-
-            await self.broadcast({
-                "event": "CHANNEL_DELETE",
-                "payload": {"channel_id": channel_id}
-            })
+        if self.channel_controller.delete_channel(channel_id):
+            await self.broadcast({"event": "CHANNEL_DELETE", "payload": {"channel_id": channel_id}})
 
     async def handle_channel_update(self, payload, writer):
         channel_id = payload.get("channel_id")
         new_name = payload.get("name")
-
-        channel = self.community.get_channel(channel_id)
-        if not channel:
-            return
-
-        channel.name = new_name
-        self.db.save_channel(self.community.id, channel)
-
-        await self.broadcast({
-            "event": "CHANNEL_UPDATE",
-            "payload": {"channel_id": channel_id, "name": new_name}
-        })
+        if self.channel_controller.update_channel(channel_id, new_name):
+            await self.broadcast({
+                "event": "CHANNEL_UPDATE",
+                "payload": {"channel_id": channel_id, "name": new_name}
+            })
 
     # ---------------- VOICE ------------------
 
@@ -226,6 +218,48 @@ class EventServer:
         self.active_channels[user_id] = channel_id
 
         await self.send_event(writer, "CHANNEL_SWITCHED", {"channel_id": channel_id})
+
+    # ---------------- MESSAGE OPERATIONS ----------------
+    async def handle_message_edit(self, payload, writer):
+        channel_id = payload.get("channel_id")
+        message_id = payload.get("message_id")
+        new_content = payload.get("content")
+        if self.channel_controller.edit_message(channel_id, message_id, new_content):
+            await self.broadcast({
+                "event": "MESSAGE_EDIT",
+                "payload": {"channel_id": channel_id, "message_id": message_id, "content": new_content}
+            })
+
+    async def handle_message_delete(self, payload, writer):
+        channel_id = payload.get("channel_id")
+        message_id = payload.get("message_id")
+        if self.channel_controller.delete_message(channel_id, message_id):
+            await self.broadcast({
+                "event": "MESSAGE_DELETE",
+                "payload": {"channel_id": channel_id, "message_id": message_id}
+            })
+
+    async def handle_message_react(self, payload, writer):
+        channel_id = payload.get("channel_id")
+        message_id = payload.get("message_id")
+        user_id = self.clients.get(writer)
+        emoji = payload.get("emoji")
+        if self.channel_controller.add_reaction(channel_id, message_id, user_id, emoji):
+            await self.broadcast({
+                "event": "MESSAGE_REACT",
+                "payload": {"channel_id": channel_id, "message_id": message_id, "user_id": user_id, "emoji": emoji}
+            })
+
+    async def handle_message_remove_react(self, payload, writer):
+        channel_id = payload.get("channel_id")
+        message_id = payload.get("message_id")
+        user_id = self.clients.get(writer)
+        emoji = payload.get("emoji")
+        if self.channel_controller.remove_reaction(channel_id, message_id, user_id, emoji):
+            await self.broadcast({
+                "event": "MESSAGE_REMOVE_REACT",
+                "payload": {"channel_id": channel_id, "message_id": message_id, "user_id": user_id, "emoji": emoji}
+            })
 
     # ---------------- UTIL ----------------
 

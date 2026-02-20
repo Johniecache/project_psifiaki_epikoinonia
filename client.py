@@ -63,6 +63,17 @@ class ClientController:
             "payload": {"channel_id": channel_id}
         }))
 
+    async def switch_channel(self, channel_id: str):
+        """Switch active channel with server notification."""
+        self.channel_id = channel_id
+        await self._send({
+            "event": "SWITCH_CHANNEL",
+            "payload": {"channel_id": channel_id}
+        })
+
+    def set_active_channel(self, channel_id: str):
+        asyncio.run_coroutine_threadsafe(self.switch_channel(channel_id), self.loop)
+
 
     async def _connect(self):
         self.reader, self.writer = await asyncio.open_connection(SERVER_HOST, SERVER_PORT)
@@ -161,7 +172,29 @@ class ClientController:
             elif event == "CHANNEL_SWITCHED":
                 self.channel_id = payload["channel_id"]
 
-                        
+    async def edit_message(self, channel_id, message_id, new_content):
+        await self._send({
+            "event": "MESSAGE_EDIT",
+            "payload": {"channel_id": channel_id, "message_id": message_id, "content": new_content}
+        })
+
+    async def delete_message(self, channel_id, message_id):
+        await self._send({
+            "event": "MESSAGE_DELETE",
+            "payload": {"channel_id": channel_id, "message_id": message_id}
+        })
+
+    async def add_reaction(self, channel_id, message_id, emoji):
+        await self._send({
+            "event": "MESSAGE_REACT",
+            "payload": {"channel_id": channel_id, "message_id": message_id, "emoji": emoji}
+        })
+
+    async def remove_reaction(self, channel_id, message_id, emoji):
+        await self._send({
+            "event": "MESSAGE_REMOVE_REACT",
+            "payload": {"channel_id": channel_id, "message_id": message_id, "emoji": emoji}
+        })
     # ------------------ Voice ------------------
     def start_voice(self, udp_port=6000):
         if self.voice_running:

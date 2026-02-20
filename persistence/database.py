@@ -1,5 +1,5 @@
 import sqlite3
-
+import json
 
 class Database:
     def __init__(self, path="server.db"):
@@ -24,7 +24,8 @@ class Database:
                 channel_id TEXT,
                 author_id TEXT,
                 timestamp INTEGER,
-                content TEXT
+                content TEXT,
+                reactions TEXT DEFAULT '{}'
             )
         """)
 
@@ -58,16 +59,36 @@ class Database:
 
     def save_message(self, channel_id, message):
         cursor = self.conn.cursor()
-        cursor.execute(
-            "INSERT INTO messages VALUES (?, ?, ?, ?, ?)",
-            (message.id, channel_id, message.author_id, message.timestamp, message.content),
-        )
+        cursor.execute("""
+            INSERT OR REPLACE INTO messages VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            message.id,
+            channel_id,
+            message.author_id,
+            message.timestamp,
+            message.content,
+            json.dumps(message.reactions)
+        ))
         self.conn.commit()
 
     def load_messages(self, channel_id):
         cursor = self.conn.cursor()
-        cursor.execute(
-            "SELECT id, author_id, timestamp, content FROM messages WHERE channel_id=? ORDER BY timestamp ASC",
-            (channel_id,),
-        )
-        return cursor.fetchall()
+        cursor.execute("""
+            SELECT id, author_id, timestamp, content, reactions 
+            FROM messages 
+            WHERE channel_id=? 
+            ORDER BY timestamp ASC
+        """, (channel_id,))
+        rows = cursor.fetchall()
+        result = []
+        for row in rows:
+            msg_id, author_id, timestamp, content, reactions_json = row
+            from core.models.message import Message
+            msg = Message(author_id, content)
+            msg.id = msg_id
+            msg.timestamp = timestamp
+            msg.reactions = json.loads(reactions_json) if reactions_json else {}
+            if not content:
+                msg.deleted = True
+            result.append(msg)
+        return result
